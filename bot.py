@@ -9,11 +9,13 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 TG_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-# The Feeds
+# The Upgraded Pro-Trader Feeds
 FEEDS = [
     'https://finance.yahoo.com/news/rss',
-    'https://www.fxstreet.com/rss/news',
-    'https://investinglive.com/rss/news'
+    'https://www.fxstreet.com/rss/news',              # High-tier currency pairs
+    'https://investinglive.com/rss/news',             # General market news
+    'https://www.forexlive.com/feed',                 # Essential for MT4/FXCM scalpers
+    'https://www.myfxbook.com/rss/latest-forex-news'  # Myfxbook community news
 ]
 
 def send_telegram(text):
@@ -22,18 +24,38 @@ def send_telegram(text):
 
 def analyze_and_send():
     now_utc = datetime.now(timezone.utc)
-    time_limit = now_utc - timedelta(minutes=6) # Look for news from the last 6 minutes
+    # FOR TESTING: Looking at the last 2 days so we guarantee a message triggers right now!
+    time_limit = now_utc - timedelta(days=2) 
     bd_timezone = pytz.timezone('Asia/Dhaka')
+
+    # The "Fake Mustache" - This makes us look like a standard web browser
+    request_headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    }
 
     for url in FEEDS:
         try:
-            response = requests.get(url, timeout=10)
+            # We pass the fake headers to bypass the scraper block
+            response = requests.get(url, headers=request_headers, timeout=10)
+            
+            # If the website still blocks us (Status code 403 or 404), skip it safely without crashing
+            if response.status_code != 200:
+                print(f"Blocked by {url} - Status Code: {response.status_code}")
+                continue
+
             root = ET.fromstring(response.content)
             
+            # FXLive and some others use a namespace, so we search broadly for items
             for item in root.findall('.//item'):
-                title = item.find('title').text
+                title = item.find('title').text if item.find('title') is not None else "No Title"
                 desc = item.find('description').text if item.find('description') is not None else "No summary."
-                pub_date_str = item.find('pubDate').text
+                pub_date_node = item.find('pubDate')
+                
+                # Skip if there's no published date
+                if pub_date_node is None:
+                    continue
+                    
+                pub_date_str = pub_date_node.text
                 
                 # Parse date and ensure it's timezone aware
                 try:
@@ -54,10 +76,16 @@ def analyze_and_send():
                     "Analysis" (One short, punchy sentence explaining the market impact)."""
 
                     payload = {"contents": [{ "parts": [{"text": prompt}] }]}
-                    headers = {"Content-Type": "application/json"}
+                    gemini_headers = {"Content-Type": "application/json"}
                     api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
                     
-                    ai_response = requests.post(api_url, headers=headers, json=payload)
+                    ai_response = requests.post(api_url, headers=gemini_headers, json=payload)
+                    
+                    # Safe check if Gemini API fails
+                    if ai_response.status_code != 200:
+                        print(f"Gemini API Error: {ai_response.status_code}")
+                        continue
+                        
                     ai_data = ai_response.json()
                     
                     # Clean and parse JSON response
@@ -79,6 +107,7 @@ def analyze_and_send():
                     )
                     
                     send_telegram(msg)
+                    print(f"Sent alert for: {title}")
                     
         except Exception as e:
             print(f"Error processing {url}: {e}")
