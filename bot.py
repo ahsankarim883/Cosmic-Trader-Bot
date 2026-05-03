@@ -13,7 +13,6 @@ TG_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 FEEDS = [
     'https://finance.yahoo.com/news/rss',
     'https://www.fxstreet.com/rss/news',              # High-tier currency pairs
-    'https://investinglive.com/rss/news',             # General market news
     'https://www.forexlive.com/feed',                 # Essential for MT4/FXCM scalpers
     'https://www.myfxbook.com/rss/latest-forex-news'  # Myfxbook community news
 ]
@@ -77,7 +76,9 @@ def analyze_and_send():
 
                     payload = {"contents": [{ "parts": [{"text": prompt}] }]}
                     gemini_headers = {"Content-Type": "application/json"}
-                    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+                    
+                    # THE FIX: Pointing to the new, active Gemini API endpoint
+                    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
                     
                     ai_response = requests.post(api_url, headers=gemini_headers, json=payload)
                     
