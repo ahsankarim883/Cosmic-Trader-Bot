@@ -24,7 +24,7 @@ def send_telegram(text):
 def analyze_and_send():
     now_utc = datetime.now(timezone.utc)
     # FOR TESTING: Looking at the last 2 days so we guarantee a message triggers right now!
-    time_limit = now_utc - timedelta(days=2) 
+    time_limit = now_utc - timedelta(minutes=6)
     bd_timezone = pytz.timezone('Asia/Dhaka')
 
     # The "Fake Mustache" - This makes us look like a standard web browser
